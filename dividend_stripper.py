@@ -11,6 +11,7 @@ import sys
 import requests
 import calendar
 import time
+import MySQLdb
 
 # BeautifulSoup HTML parsing library
 from bs4 import BeautifulSoup, SoupStrainer
@@ -19,11 +20,9 @@ from bs4 import BeautifulSoup, SoupStrainer
 from yahoo_finance import Share
 
 # Proxy generator
-sys.path.append("./request_proxy/")
+sys.path.append("./AccessoryLibraries/HTTP_Request_Randomizer/")
 from http.requests.proxy.requestProxy import RequestProxy
 
-# Contain all data in a MySQL database
-import MySQLdb
 
 # Database login information.  Change this to fit your own parameters
 DB_HOST="127.0.0.1"
@@ -249,7 +248,7 @@ def main(argc, argv):
     
 
 def strip_dividends(ticker, req_proxy):
-
+    
     return_html = "<table class=\"table\">"\
                     + "<thead>"\
                     +     "<tr>"\
@@ -272,12 +271,16 @@ def strip_dividends(ticker, req_proxy):
     skip = False
     while ex_dividend_data is None:
         try:
+            print "Flag1"
+            
             ex_dividend_data = None
 
             if req_proxy is not None:
                 ex_dividend_data = req_proxy.generate_proxied_request("http://dividata.com/stock/%s/dividend" % ticker)
             else:
                 ex_dividend_data = requests.get("http://dividata.com/stock/%s/dividend" % ticker)
+
+            print "Flag2"
 
             if ex_dividend_data is not None:
                 if ex_dividend_data.status_code == 404:
@@ -286,14 +289,21 @@ def strip_dividends(ticker, req_proxy):
                 if ex_dividend_data.status_code != 200:
                     ex_dividend_data = None
         
+            print "Flag3"
+        
         except Exception as e:
+            print "Here!"
+            print "[ERROR]: %s" % str(e)
             return return_html + "</tbody></table>"
             skip = True
             break
 
+    print "THINTHTTTHINASIDJWENSFJASER"
+
     # If something went wrong collecting data, just go on to the next ticker
     if skip is True:
         return return_html + "</tbody></table>"
+
 
     # Parse it using BeautifulSoup
     ex_dividend_soup = BeautifulSoup(ex_dividend_data.text, 'html5lib');
@@ -301,6 +311,8 @@ def strip_dividends(ticker, req_proxy):
     # Extract the dates and dividend amounts for each stock.
     ex_dividend_history = []
     ex_dividend_soup = ex_dividend_soup.find_all("tr")
+
+    print "GOT HERE!!!!!!!!"
 
     # The first element in the list is useless, get rid of it
     # Figure out a better way to deal with this
@@ -340,6 +352,7 @@ def strip_dividends(ticker, req_proxy):
             ex_dividend_stock_prices.append((ticker_share.get_historical(subtract_one_day(ex_div[0]),
                 ex_div[0]), ex_div[1]))
         except Exception as e:
+            print "[ERROR]: %s" % str(e)
             import code; code.interact(local=locals())
 
         time.sleep(0.1)

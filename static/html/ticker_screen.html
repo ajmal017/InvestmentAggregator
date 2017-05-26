@@ -532,7 +532,7 @@ ws.onmessage = function(received_message)
 	{
 		message_text = message_text.replace("BB:", "");
 		var bb_image_container = document.getElementById("bb-image-container");
-		bb_image_container.innerHTML = "<img src=\"/static/pictures/" + String(stock_ticker) + ".png\"></img>";
+		bb_image_container.innerHTML = "<img src=\"/tmp/" + String(stock_ticker) + ".png\"></img>";
 		
 		var bb_text_container = document.getElementById("bb-recommendation-container");
 		if(message_text == "GoodCandidate")
