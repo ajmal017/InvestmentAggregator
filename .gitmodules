@@ -1,0 +1,12 @@
+[submodule "AccessoryLibraries/HTTP_Request_Randomizer"]
+	path = AccessoryLibraries/HTTP_Request_Randomizer
+	url = git@github.com:pgaref/HTTP_Request_Randomizer.git
+[submodule "AccessoryLibraries/RobinhoodPython"]
+	path = AccessoryLibraries/RobinhoodPython
+	url = git@github.com:andrew-kirfman/RobinhoodPython.git
+[submodule "AccessoryLibraries/YahooFinanceHistoricalDataExtractor"]
+	path = AccessoryLibraries/YahooFinanceHistoricalDataExtractor
+	url = git@github.com:andrew-kirfman/YahooFinanceHistoricalDataExtractor.git
+[submodule "AccessoryLibraries/BollingerBandStrategy"]
+	path = AccessoryLibraries/BollingerBandStrategy
+	url = git@github.com:andrew-kirfman/BollingerBandStrategy.git
