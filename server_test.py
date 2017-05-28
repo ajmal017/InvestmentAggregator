@@ -14,37 +14,38 @@
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
+from tornado.options import define, options, parse_command_line
 import os
 import sys
 import logging
 import copy
 import requests
-from tornado.options import define, options, parse_command_line
 import MySQLdb
-import smtplib
-from email.mime.text import MIMEText
+import atexit
 from yahoo_finance import Share
+from bs4 import BeautifulSoup
 
-# Need to move this to a separate module
 sys.path.append(".")
 sys.path.append("./AccessoryLibraries/BollingerBandStrategy/")
 sys.path.append("./AccessoryLibraries/YahooFinanceHistoricalDataExtractor/")
+sys.path.append("./AccessoryLibraries/HTTP_Request_Randomizer/")
+sys.path.append("./AccessoryLibraries/RobinhoodPython/")
+
 from dividend_stripper import strip_dividends
 from bollinger_bands import BollingerBandStrategy
 from yahoo_finance_historical_data_extractor import YFHistoricalDataExtract
-
-import requests
 from http.requests.proxy.requestProxy import RequestProxy
-from bs4 import BeautifulSoup
+from robinhood import RobinhoodInstance
 
 # ---------------------------------------------------------------------------- #
 # Global Variables                                                             #
 # ---------------------------------------------------------------------------- #
 
-TICKER_FILE="./data/publicly_traded_stocks.txt"
+TICKER_FILE = "stock_file.txt"
 TEMP_DIR = "/tmp/InvestmentAggregator"
 YAHOO_FINANCE_HISTORICAL_OBJECT = None
 
+ROBINHOOD_INSTANCE = None
 
 """
 
@@ -85,11 +86,8 @@ use_proxy = False
 # I'm pretty sure that Python will get mad if I do not forward declare this variable
 req_proxy = None
 
-if use_proxy is False:
-    import requests
-else:
+if use_proxy is True:
     req_proxy = RequestProxy()
-
 
 # ---------------------------------------------------------------------------- #
 # Database Call Level Interface                                                #
@@ -209,9 +207,9 @@ class ticker_data:
         if os.path.exists(TICKER_FILE):
             f = open(TICKER_FILE, "r")
         else:
-            
-            # TODO: Call robinhood to get it to keep the 
-            
+
+            # TODO: Call robinhood to get it to keep the
+
             pass
 
 
@@ -249,57 +247,6 @@ class ticker_data:
 
 """
 
-# ---------------------------------------------------------------------------- #
-# Scraper for company news                                                     #
-# ---------------------------------------------------------------------------- #
-
-"""
-
-def update_descriptions():
-    if use_proxy is True:
-        global req_proxy
-
-    for root, dirname, filenames in os.walk("../task_1/google_search_program/cleaned_data"):
-        if dirname != []:
-            for ticker in dirname:
-                desc_link = "http://www.reuters.com/finance/stocks/companyProfile?symbol="\
-                    + str(ticker) + "&rpc=66"
-
-                request = None
-
-                while request is None:
-
-                    if use_proxy is True:
-                        request = req_proxy.generate_proxied_request(desc_link)
-                    else:
-                        request = requests.get(desc_link)
-
-                    if request is not None:
-                        if request.status_code != 200:
-                            request = None
-
-                request_soup = BeautifulSoup(request.text, "html5lib")
-
-                if len(request_soup.find_all("div", { "class" : "moduleBody" })) < 2:
-                    continue
-
-                company_description = request_soup.find_all("div", { "class" : "moduleBody" })[1]
-
-                # Sometimes, an extra div sticks around.  Just get rid of it if it is there
-                bad_parts = company_description.find_all("div")
-
-                if len(bad_parts) > 0:
-                    company_description = str(company_description).replace(str(bad_parts[0]), "")
-
-                # Actually write the company description to a file
-                print "Writing: %s" % (ticker)
-                f = open("../task_1/google_search_program/cleaned_data/%s/company_description" % ticker, "w+")
-                f.seek(0)
-                f.write(str(company_description))
-                f.close()
-
-"""
-
 def update_description_oneoff(ticker):
     if use_proxy is True:
         global req_proxy
@@ -323,10 +270,10 @@ def update_description_oneoff(ticker):
 
     request_soup = BeautifulSoup(request.text, "html5lib")
 
-    if len(request_soup.find_all("div", { "class" : "moduleBody" })) < 2:
+    if len(request_soup.find_all("div", {"class" : "moduleBody"})) < 2:
         return "<div class=\"moduleBody\">No Description Found</div>"
 
-    company_description = request_soup.find_all("div", { "class" : "moduleBody" })[1]
+    company_description = request_soup.find_all("div", {"class" : "moduleBody"})[1]
 
     # Sometimes, an extra div sticks around.  Just get rid of it if it is there
     bad_parts = company_description.find_all("div")
@@ -361,7 +308,7 @@ def get_company_title(ticker):
 
         request_soup = BeautifulSoup(request.text, "html5lib")
 
-        company_name = request_soup.find_all("div", { "id" : "sectionTitle" })[0].text.strip().split(":")[1]
+        company_name = request_soup.find_all("div", {"id" : "sectionTitle"})[0].text.strip().split(":")[1]
 
         return company_name
     except Exception:
@@ -391,9 +338,65 @@ class TipsHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("./static/html/investing_tips.html")
 
+class RobinhoodLogin(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    def get(self):
+        self.render("./static/html/robinhood_login.html")
+
 # ---------------------------------------------------------------------------- #
 # Websocket Handlers                                                           #
 # ---------------------------------------------------------------------------- #
+
+class MainWsHandler(tornado.websocket.WebSocketHandler):
+    def check_origin(self, _):
+        return True
+        
+    def open(self, _):
+        pass
+        
+    def on_message(self, message):
+        print_logger.debug("Message: %s" % str(message))
+        
+        if "ValidateTicker" in message:
+            message = message.split(":")
+
+            if len(message) != 2:
+                print_logger.error("Malformed ticker validation request")
+                self.write_message("ValidationFailed:Malformed")
+                return
+
+            ticker = message[1]
+
+            # The file I have stored didn't end up being a good validation
+            # option as it does not contain a complete list of all
+            # securities.  I have to acquire the data from yahoo
+            # finance anyway, so just use that.  The Share function
+            # call will throw a NameError exception if the ticker doesn't exist
+            # isValid = current_stock_list.is_valid_stock(ticker)
+
+            isValid = True
+            try:
+                test = Share(str(ticker))
+
+                if test.get_price() is None:
+                    isValid = False
+            except NameError:
+                isValid = False
+
+            if isValid:
+                self.write_message("ValidationSucceeded:%s" % ticker)
+                print_logger.debug("Ticker was valid")
+            else:
+                self.write_message("ValidationFailed:%s" % ticker)
+                print_logger.debug("Ticker was bad")
+
+            return
+            
+        elif "CheckRobinhoodLogin" in message:
+            if ROBINHOOD_INSTANCE.is_logged_in() is True:
+                self.write_message("RobinhoodLoggedIn:" + str(ROBINHOOD_INSTANCE.username))
+
+
 
 class TickerWsHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, _):
@@ -439,7 +442,7 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
                 print_logger.debug("Ticker was bad")
 
             return
-            
+
         elif "GetCompanyName" in message:
             print_logger.debug("You got here")
             message = message.split(":")
@@ -447,7 +450,7 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
             company_name = get_company_title(company_ticker)
 
             self.write_message("CompanyName:%s" % company_name)
-            
+
         elif "GetStockData" in message:
             message = message.split(":")
 
@@ -504,7 +507,7 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
 
             self.write_message("StockData;%s" % (share_string))
             print_logger.debug("Sending Message: StockData;%s" % (share_string))
-            
+
         elif "GetCompanyDesc" in message:
             message = message.split(":")
 
@@ -517,7 +520,7 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
             description = update_description_oneoff(ticker)
 
             self.write_message("CompanyDescription:%s" % str(description))
-            
+
         elif "GetCompanyDividend" in message and "Record" not in message:
             message = message.split(":")
 
@@ -541,7 +544,7 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
 
             # Send this div up to the server
             self.write_message("DividendHistoryData:" + str(dividend_soup))
-            
+
         elif "GetCompanyDividendRecord" in message:
             message = message.split(":")
 
@@ -565,31 +568,100 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
                 return
 
             ticker = message[1]
-            
+
             # Switch into the tmp directory
             old_dir = os.getcwd()
             os.chdir(TEMP_DIR)
-            
+
             # Update the historical data for the ticker symbol
             YAHOO_FINANCE_HISTORICAL_OBJECT.read_ticker_historical(ticker)
-            
+
             bands = BollingerBandStrategy(data_storage_dir="%s/historical_stock_data" % TEMP_DIR\
                     , ticker_file="%s/stock_list.txt" % TEMP_DIR, filtered_ticker_file=\
                     "%s/filtered_stock_list.txt" % TEMP_DIR)
-            
+
             # Save the graph so that we can show it on the website
             bands.save_stock_chart(ticker, "%s" % TEMP_DIR)
-            
+
             # Also let the server know that we found an answer
             result = bands.test_ticker(ticker)
-            
+
             if result is not None:
                 print_logger.debug("BB:GoodCandidate")
                 self.write_message("BB:GoodCandidate")
             else:
                 print_logger.debug("BB:BadCandidate")
-                print_logger.debug("BB:BadCandidate")
+                self.write_message("BB:BadCandidate")
+        elif "CheckRobinhoodLogin" in message:
+            if ROBINHOOD_INSTANCE.is_logged_in() is True:
+                self.write_message("RobinhoodLoggedIn")
 
+class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
+    def check_origin(self, _):
+        return True
+        
+    def open(self):
+        pass
+        
+    def on_message(self, message):
+        print_logger.debug("Message: %s" % str(message))
+        print "Message: %s" % (message)
+        
+        if "ValidateTicker" in message:
+            message = message.split(":")
+
+            if len(message) != 2:
+                print_logger.error("Malformed ticker validation request")
+                self.write_message("ValidationFailed:Malformed")
+                return
+
+            ticker = message[1]
+
+            # The file I have stored didn't end up being a good validation
+            # option as it does not contain a complete list of all
+            # securities.  I have to acquire the data from yahoo
+            # finance anyway, so just use that.  The Share function
+            # call will throw a NameError exception if the ticker doesn't exist
+            # isValid = current_stock_list.is_valid_stock(ticker)
+
+            isValid = True
+            try:
+                test = Share(str(ticker))
+
+                if test.get_price() is None:
+                    isValid = False
+            except NameError:
+                isValid = False
+
+            if isValid:
+                self.write_message("ValidationSucceeded:%s" % ticker)
+                print_logger.debug("Ticker was valid")
+            else:
+                self.write_message("ValidationFailed:%s" % ticker)
+                print_logger.debug("Ticker was bad")
+
+            return
+            
+        elif "Login:" in message and "CheckRobinhood" not in message:
+            message = message.split(":")
+
+            if len(message) != 3:
+                print_logger.debug("Malformed login message from client")
+                self.write_message("LoginFailed")
+            
+            username = message[1]
+            password = message[2]
+            
+            ROBINHOOD_INSTANCE.login(username, password)
+            
+            if ROBINHOOD_INSTANCE.is_logged_in() is True:
+                self.write_message("LoginSucceeded")
+            else:
+                self.write_message("LoginFailed")
+            
+        elif "CheckRobinhoodLogin" in message:
+            if ROBINHOOD_INSTANCE.is_logged_in() is True:
+                self.write_message("RobinhoodLoggedIn")
 
 # ---------------------------------------------------------------------------- #
 # Generic File Handler                                                         #
@@ -608,25 +680,28 @@ class ProgramFileHandler(tornado.web.StaticFileHandler):
 class TmpFileHandler(tornado.web.StaticFileHandler):
     def initialize(self, path):
         self.dirname, self.filename = os.path.split(path)
-        super(ProgramFileHandler, self).initialize(self.dirname)
+        super(TmpFileHandler, self).initialize(self.dirname)
 
     def get(self, path=None, include_body=True):
         program_file = str(self.dirname) + '/' + str(self.filename) + '/' + str(path)
-        super(ProgramFileHandler, self).get(program_file, include_body)
+        super(TmpFileHandler, self).get(program_file, include_body)
 
 # ---------------------------------------------------------------------------- #
 # Master Handler List                                                          #
 # ---------------------------------------------------------------------------- #
 
 
-settings = { }
+settings = {}
 handlers = [
     (r'/', MainScreenHandler),
-    (r'/ws_ticker(.*)', TickerWsHandler),
+    (r'/ws_main(.*)', MainWsHandler),
     (r'/ticker', TickerHandler),
+    (r'/ws_ticker(.*)', TickerWsHandler),
+    (r'/robinhood_login', RobinhoodLogin),
+    (r'/ws_robinhood_login', RobinhoodWsHandler),
     (r'/investing_tips', TipsHandler),
     (r'/investing_strategies', StrategiesHandler),
-    (r'/(.*)', ProgramFileHandler, {'path' : './'}),
+    (r'/static/(.*)', ProgramFileHandler, {'path' : './static'}),
     (r'/tmp/(.*)', TmpFileHandler, {'path' : '%s' % TEMP_DIR})
     ]
 
@@ -635,6 +710,15 @@ handlers = [
 # ---------------------------------------------------------------------------- #
 
 app = tornado.web.Application(handlers, **settings)
+
+
+def clean_up_tmp_directory():
+    """
+    This function should be called upon program termination.  Its purpose is to
+    delete the temp directory pointed to by TEMP_DIR.
+    """
+
+    os.system("rm -rf %s" % TEMP_DIR)
 
 if __name__ == '__main__':
     #update_descriptions()
@@ -646,16 +730,32 @@ if __name__ == '__main__':
     # Directory Setup                                                          #
     # ------------------------------------------------------------------------ #
 
-    # Wipe any old temp directory if there is one 
+
+    # REMOVE THIS LATER!!!!!!!
+
+
+
+
+
+    # Wipe any old temp directory if there is one
     if os.path.exists(TEMP_DIR):
-        os.system("rm -rf %s" % TEMP_DIR)
-    
+        #os.system("rm -rf %s" % TEMP_DIR)
+        pass
+
     # Try to create a tmp directory to store any and all needed temp files
     try:
-        os.makedirs(TEMP_DIR)
+        if not os.path.exists(TEMP_DIR):
+            os.makedirs(TEMP_DIR)
     except Exception:
         print "Could not create folder in /tmp.  Exiting..."
         sys.exit(1)
+
+    # Instantiate the robinhood object
+    ROBINHOOD_INSTANCE = RobinhoodInstance()
+
+    if not os.path.exists("%s/%s" % (TEMP_DIR, TICKER_FILE)):
+        print "Creating ticker file!" 
+        ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
 
     #
     #
@@ -665,13 +765,15 @@ if __name__ == '__main__':
     #
     #
     #
-    
-    
 
-    YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("stock_list.txt", data_storage_dir=\
-            "%s/historical_stock_data" % TEMP_DIR)
+    # Create an object to deal with retrieving historical data.
+    YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE), 
+            data_storage_dir="%s/historical_stock_data" % TEMP_DIR)
 
-    # Start the tornado server.  
+    # Install the atexit handler which will wipe the temporary files stored in /tmp.
+    atexit.register(clean_up_tmp_directory)
+
+    # Start the tornado server.
     tornado.ioloop.IOLoop.instance().start()
 
 """

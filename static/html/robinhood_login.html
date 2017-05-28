@@ -64,6 +64,16 @@ code {
     padding-right: 1%;
 }
 
+.robinhood-logo
+{
+    width: 300px;
+    position: absolute;
+    left: 50%;
+    margin-left: -150px;
+    border-radius: 10px;
+}
+
+
 </style>
 <script>
 /* ------------------------------------------------------------------------- */
@@ -123,7 +133,7 @@ var host_addr = host_parser.host;
 /* Websocket Communication                                                   */
 /* ------------------------------------------------------------------------- */
 
-var socket_addr = "ws://" + host_addr + "/ws_main";
+var socket_addr = "ws://" + host_addr + "/ws_robinhood_login";
 var ws = new WebSocket(socket_addr);
 
 ws.onopen = function()
@@ -149,6 +159,27 @@ ws.onmessage = function(received_message)
         // Indicate that the search failed
 
     }
+    else if(message_text.indexOf("LoginSucceeded") >= 0)
+    {
+        window.location.href = "/";
+    }
+    else if(message_text.indexOf("LoginFailed") >= 0)
+    {
+        var username_box = document.getElementById("username-box");
+        var password_box = document.getElementById("password-box");
+        
+        username_box.className = username_box.className.replace("has-error", "");
+        password_box.className = password_box.className.replace("has-error", "");
+        
+        username_box.className = username_box.className + " has-error";
+        password_box.className = username_box.className + " has-error";
+        
+        var username = document.getElementById("username");
+        var password = document.getElementById("password");
+        
+        username.value = "";
+        password.value = "";
+    }
     else if(message_text.indexOf("RobinhoodLoggedIn") >= 0)
     {
         var fields = message_text.split(":");
@@ -157,7 +188,7 @@ ws.onmessage = function(received_message)
         robinhood_container = document.getElementById("robinhood-container");
         
         robinhood_container.innerHTML = '<li><a href="/robinhood_login" '
-            + 'style="color:#20CE99;">Logged Into Robinhood As: ' + String(username) 
+            + 'style="color:#20CE99;">Logged into Robinhood as: ' + String(username) 
             + '</a></li>';
     }
 };
@@ -175,6 +206,17 @@ function GoToTicker()
 	var ticker_name = document.getElementById("ticker-text").value.trim().toUpperCase()
 	
 	ws.send("ValidateTicker:" + String(ticker_name));
+}
+
+function Login()
+{
+    var username_box = document.getElementById("username");
+    var password_box = document.getElementById("password");
+    
+    var username = username_box.value.trim();
+    var password = password_box.value.trim();
+    
+    ws.send("Login:" + String(username) + ":" + String(password))
 }
 
 </script>
@@ -223,81 +265,68 @@ $(document).ready(function(){
 		</div>
 	</nav>
     <div class="container-fluid">
+        <div class="row">
+            <h1 class="text-center" style="color:#20CE99;">Log Into Robinhood!</h1>
+        </div>
         
-		<div class="row">
-			
-			<div class="col-md-10" style="width:82%;height:70%;left: 0.5%;" id="tradingview-div">
-				<h3 style="color: #ffffff;">Markets at a Glance:</h3>
+        <div class="row">
+            <div class="col-md-4"></div>
+            
+            <div class="col-md-4">
+                <h4 class="text-center" style="color:#FFFFFF;">
+                Logging in will allow you to view your existing positions along with opening/closing new ones.  
+                </h4>
+            </div>
+            
+            <div class="col-md-4"></div>
+        </div>
+        
+        <div class="row" style="padding-top:25px;">
+        </div>
+        
+        <div class="row">
+            <img src="/static/pictures/Robinhood_Logo.png" class="robinhood-logo">
+        </div>
+        
+        <div class="row" style="padding-top:310px;">
+            <div class="col-md-4"></div>
+            
+            <div class="col-md-4">
+                <div class="form-group" id="username-box">
+                    <label for="username" style="color:#20CE99;">Username:</label>
+                    <input type="text" class="form-control" id="username">
+                </div>
+            </div>
+            
+            <div class="col-md-4"></div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4"></div>
+            
+            <div class="col-md-4">
+                <div class="form-group" id="password-box">
+                    <label for="password" style="color:#20CE99;">Password:</label>
+                    <input type="password" class="form-control" id="password">
+                </div>
+            </div>
+            
+            <div class="col-md-4"></div>
+        </div>        
 
-				<script type="text/javascript" src="https://s3.amazonaws.com/tradingview/tv.js"></script>    
-				<script type="text/javascript">      
-					x = new TradingView.MiniWidget({        
-						container_id: 'tv-miniwidget-2', 
-						tabs: ['Equities', 'Commodities', 'Bonds', 'Forex'], 
-						symbols: {          
-							Equities: ['S&P500', 'NQ100', 'Dow30', 'Nikkei225'/*, 'Apple', 'Google'*/], 
-							Commodities: ['Emini', 'Euro', 'Gold', 'Oil', 'Gas', 'Corn'], 
-							Bonds: ['US 2YR', 'US 10YR', 'US 30YR', 'Euro Bund', 'Euro BTP', 'Euro BOBL'], 
-							Forex: ['FX:EURUSD', 'FX:GBPUSD', 'FX:USDJPY', 'FX:USDCHF', 'FX:AUDUSD', 'FX:USDCAD']        
-						}, 
-						symbols_description: {          
-							'S&P500': ' SPX', 
-							'NQ100': 'NASX', 
-							'Dow30': 'DOWI', 
-							'Nikkei225': 'NKY', 
-							//'Apple': ' BATS:AAPL ', 
-							//'Google': 'BATS:GOOG', 
-							'Emini': 'ES1!', 
-							'Euro': 'E61!', 
-							'Gold': 'GC1!', 
-							'Oil': 'CL1!', 
-							'Gas': 'NG1!', 
-							'Corn': 'ZC1!', 
-							'US 2YR': 'TUZ2013', 
-							'US 10YR': 'TYZ2013', 
-							'US 30YR': 'USZ2013', 
-							'Euro Bund': 'FX:BUND', 
-							'Euro BTP': 'EUREX:II1!', 
-							'Euro BOBL': 'EUREX:HR1!'        
-						}, 
-					width: "100%", 
-					height: "100%",
-					height: widget_height,
-					showChart: "true",
-					plotLineColorGrowing: "3cbc98",
-					styleTickerLastUpBg: "3cbc98",
-					gridLineColor: "e9e9ea",
-					styleTickerChangeUpColor: "3cbc98",
-					styleTickerChangeDownColor: "3cbc98",
-					large_chart_url: 'http://www.futuresmag.com/page/interactive-charts'      
-					});    
-				</script>
-			</div>
-			
-			
-			<div class="col-md-2">
-				<div class="scroll-box">
-					<h3 style="color:#ffffff">How to use this site!</h3>
-					
-					<p style="font-size:16px;color: #ffffff;">
-					InvestmentAggregator.com is a website which aims to serve as a "one stop shop" for all investing and trading information.  No longer will an investor have to visit 10 different sites just
-					to do research and educate themselves enough to know which stocks to buy.  
-					</p>
-					
-					<p style="font-size:16px;color: #ffffff;">
-					Simply search for a stock by the ticker name and you will be whisked away to a page containing data and in depth analytics which will assist you in making educated investment decisions.  
-					
-					<p style="font-size:16px;color: #ffffff;">
-					If you are a new investor, please see the tabs "Investing Basics" and "Simple Strategies" for help getting started.  
-					</p>
-				</div>
-			</div>
-		
-		
-		
-		
-		</div>
-		
+        <div class="row">
+            <div class="col-md-4"></div>
+        
+            <div class="col-md-4">
+                <button type="button" class="btn btn-default" onclick="Login()">Login</button>
+                <button type="button" class="btn btn-danger" onclick='window.location.href="/"'>Cancel</button>
+            </div>
+        
+            <div class="col-md-4"></div>
+        </div>
+
+
+
     </div>
 
 
