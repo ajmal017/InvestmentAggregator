@@ -21,8 +21,7 @@ from yahoo_finance import Share
 
 # Proxy generator
 sys.path.append("./AccessoryLibraries/HTTP_Request_Randomizer/")
-from http.requests.proxy.requestProxy import RequestProxy
-
+from http_request_randomizer.requests.proxy.requestProxy import RequestProxy
 
 # Database login information.  Change this to fit your own parameters
 DB_HOST="127.0.0.1"
@@ -245,10 +244,10 @@ class stock_database:
 
 def main(argc, argv):
     pass
-    
+
 
 def strip_dividends(ticker, req_proxy):
-    
+
     return_html = "<table class=\"table\">"\
                     + "<thead>"\
                     +     "<tr>"\
@@ -260,8 +259,8 @@ def strip_dividends(ticker, req_proxy):
                     +   "</tr>"\
                     + "</thead>"\
                     + "<tbody>"
-                    
-    # Template for dividend requests: 
+
+    # Template for dividend requests:
     # http://dividata.com/stock/XOM/dividend
 
     ex_dividend_data = None
@@ -272,7 +271,7 @@ def strip_dividends(ticker, req_proxy):
     while ex_dividend_data is None:
         try:
             print "Flag1"
-            
+
             ex_dividend_data = None
 
             if req_proxy is not None:
@@ -285,12 +284,12 @@ def strip_dividends(ticker, req_proxy):
             if ex_dividend_data is not None:
                 if ex_dividend_data.status_code == 404:
                     raise
-                
+
                 if ex_dividend_data.status_code != 200:
                     ex_dividend_data = None
-        
+
             print "Flag3"
-        
+
         except Exception as e:
             print "Here!"
             print "[ERROR]: %s" % str(e)
@@ -371,13 +370,13 @@ def strip_dividends(ticker, req_proxy):
             post_dividend_h = float(dividend_event[0][0]['High'])
             post_dividend_high = float(dividend_event[0][0]['Close'])
             ex_div_day = dividend_event[0][1]['Date']
-            
+
             if post_dividend_open == post_dividend_h:
                 post_dividend_h = post_dividend_high
 
         except Exception as e:
             print "What went wrong: " + str(e)
-            
+
             return return_html + "</tbody></table>"
 
         # Make sure that we would make at least 10 cents per share
@@ -396,8 +395,8 @@ def strip_dividends(ticker, req_proxy):
                         +   "<td>" + "%.2f" % float(post_dividend_high) + "</td>"\
                         +   "<td>" + "%.2f" % float(post_dividend_h) + "</td>"\
                         +   "<td>" + "%.2f" % float(dividend_payout) + "</td>"\
-                        + "</tr>"            
-    
+                        + "</tr>"
+
     # Finally, return the result html
     return str(return_html)
 

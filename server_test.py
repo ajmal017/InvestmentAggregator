@@ -34,7 +34,7 @@ sys.path.append("./AccessoryLibraries/RobinhoodPython/")
 from dividend_stripper import strip_dividends
 from bollinger_bands import BollingerBandStrategy
 from yahoo_finance_historical_data_extractor import YFHistoricalDataExtract
-from http.requests.proxy.requestProxy import RequestProxy
+from http_request_randomizer.requests.proxy.requestProxy import RequestProxy
 from robinhood import RobinhoodInstance
 
 # ---------------------------------------------------------------------------- #
@@ -350,13 +350,13 @@ class RobinhoodLogin(tornado.web.RequestHandler):
 class MainWsHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, _):
         return True
-        
+
     def open(self, _):
         pass
-        
+
     def on_message(self, message):
         print_logger.debug("Message: %s" % str(message))
-        
+
         if "ValidateTicker" in message:
             message = message.split(":")
 
@@ -391,7 +391,7 @@ class MainWsHandler(tornado.websocket.WebSocketHandler):
                 print_logger.debug("Ticker was bad")
 
             return
-            
+
         elif "CheckRobinhoodLogin" in message:
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
                 self.write_message("RobinhoodLoggedIn:" + str(ROBINHOOD_INSTANCE.username))
@@ -599,14 +599,14 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
 class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, _):
         return True
-        
+
     def open(self):
         pass
-        
+
     def on_message(self, message):
         print_logger.debug("Message: %s" % str(message))
         print "Message: %s" % (message)
-        
+
         if "ValidateTicker" in message:
             message = message.split(":")
 
@@ -641,24 +641,24 @@ class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
                 print_logger.debug("Ticker was bad")
 
             return
-            
+
         elif "Login:" in message and "CheckRobinhood" not in message:
             message = message.split(":")
 
             if len(message) != 3:
                 print_logger.debug("Malformed login message from client")
                 self.write_message("LoginFailed")
-            
+
             username = message[1]
             password = message[2]
-            
+
             ROBINHOOD_INSTANCE.login(username, password)
-            
+
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
                 self.write_message("LoginSucceeded")
             else:
                 self.write_message("LoginFailed")
-            
+
         elif "CheckRobinhoodLogin" in message:
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
                 self.write_message("RobinhoodLoggedIn")
@@ -754,7 +754,7 @@ if __name__ == '__main__':
     ROBINHOOD_INSTANCE = RobinhoodInstance()
 
     if not os.path.exists("%s/%s" % (TEMP_DIR, TICKER_FILE)):
-        print "Creating ticker file!" 
+        print "Creating ticker file!"
         ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
 
     #
@@ -767,7 +767,7 @@ if __name__ == '__main__':
     #
 
     # Create an object to deal with retrieving historical data.
-    YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE), 
+    YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE),
             data_storage_dir="%s/historical_stock_data" % TEMP_DIR)
 
     # Install the atexit handler which will wipe the temporary files stored in /tmp.
