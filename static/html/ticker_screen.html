@@ -309,6 +309,7 @@ var ws = new WebSocket(socket_addr);
 ws.onopen = function()
 {  
     stock_ticker = host_parser.href.split("?")[1];
+    ws.send("CheckRobinhoodLogin");
     ws.send("GetStockData:" + String(stock_ticker));
     ws.send("GetCompanyName:" + String(stock_ticker));
     ws.send("GetCompanyDesc:" + String(stock_ticker));
@@ -665,17 +666,19 @@ ws.onmessage = function(received_message)
 		trump_row_2.appendChild(left_div);
 		trump_row_2.appendChild(middle_div);
 		trump_row_2.appendChild(right_div);
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
 	}
+    else if(message_text.indexOf("RobinhoodLoggedIn") >= 0)
+    {
+        var fields = message_text.split(":");
+        var username = fields[1];
+    
+        robinhood_container = document.getElementById("robinhood-container");
+        
+        robinhood_container.innerHTML = '<li><a href="/robinhood_login" '
+            + 'style="color:#20CE99;">Logged Into Robinhood As: ' + String(username) 
+            + '</a></li>';
+    }
+    
 };
 
 
@@ -740,6 +743,10 @@ function ExecuteQuery()
 				</div>
 			</form>
 			
+            
+            <ul class="nav navbar-nav navbar-right" id="robinhood-container">
+                <li><a href="/robinhood_login" style="color:#20CE99;">Login to Robinhood</a></li>
+            </ul>
 		</div>
 	</nav>
     <div class="container-fluid">

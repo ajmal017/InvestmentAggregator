@@ -394,7 +394,7 @@ class MainWsHandler(tornado.websocket.WebSocketHandler):
 
         elif "CheckRobinhoodLogin" in message:
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
-                self.write_message("RobinhoodLoggedIn:" + str(ROBINHOOD_INSTANCE.username))
+                self.write_message("RobinhoodLoggedIn:%s" % str(ROBINHOOD_INSTANCE.username))
 
 
 
@@ -593,8 +593,9 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
                 print_logger.debug("BB:BadCandidate")
                 self.write_message("BB:BadCandidate")
         elif "CheckRobinhoodLogin" in message:
+            print "HELLO WORLD!!! HELLO WORLD!!! HELLO WORLD!!!%s" % ROBINHOOD_INSTANCE
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
-                self.write_message("RobinhoodLoggedIn")
+                self.write_message("RobinhoodLoggedIn:%s" % ROBINHOOD_INSTANCE.username)
 
 class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, _):
@@ -661,7 +662,7 @@ class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
 
         elif "CheckRobinhoodLogin" in message:
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
-                self.write_message("RobinhoodLoggedIn")
+                self.write_message("RobinhoodLoggedIn:%s" % ROBINHOOD_INSTANCE.username)
 
 # ---------------------------------------------------------------------------- #
 # Generic File Handler                                                         #
@@ -755,7 +756,15 @@ if __name__ == '__main__':
 
     if not os.path.exists("%s/%s" % (TEMP_DIR, TICKER_FILE)):
         print "Creating ticker file!"
-        ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
+        
+        
+        #
+        #
+        # UNCOMMENT THIS LATER!!!
+        #
+        #
+        
+        #ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
 
     #
     #
