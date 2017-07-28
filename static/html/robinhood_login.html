@@ -73,6 +73,20 @@ code {
     border-radius: 10px;
 }
 
+.robinhood-green
+{
+    color: #20CE99;
+}
+
+.robinhood-white
+{
+    color: #FFFFFF;
+}
+
+.robinhood-red
+{
+    color: #FB5229
+}
 
 </style>
 <script>
@@ -84,6 +98,15 @@ code {
 /* ------------------------------------------------------------------------- */
 
 var widget_height = 790;
+
+
+function httpGet(theUrl)
+{
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open( "GET", theUrl, false ); // false for synchronous request
+    xmlHttp.send( null );
+    return xmlHttp.responseText;
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -161,7 +184,7 @@ ws.onmessage = function(received_message)
     }
     else if(message_text.indexOf("LoginSucceeded") >= 0)
     {
-        window.location.href = "/";
+        location.reload();
     }
     else if(message_text.indexOf("LoginFailed") >= 0)
     {
@@ -190,20 +213,40 @@ ws.onmessage = function(received_message)
         robinhood_container.innerHTML = '<li><a href="/robinhood_login" '
             + 'style="color:#20CE99;">Logged into Robinhood as: ' + String(username) 
             + '</a></li>';
-
-        // Since we're already logged in, change this screen to show the user's 
-        // account features.  This requires wiping over the entire main container
+            
+        logged_in_container = document.getElementById("logged-in-html");
+        logged_in_container.style = "";
+            
+        title = document.getElementById("logged-in-title");
         
-        // Figure out how to do this more eloquently...  
-        // As it stands right now, the login screen is being flashed to users...
+        title.innerHTML = title.innerHTML + String(username);
         
-        main_container = document.getElementById("main-container");
         
-        while(main_container.firstChild)
-        {
-            main_container.removeChild(main_container.firstChild);
-        }
-
+    }
+    else if(message_text.indexOf("RobinhoodNotLoggedIn") >= 0)
+    {
+        not_logged_in_container = document.getElementById("login-html");
+        not_logged_in_container.style = "";
+    }
+    else if(message_text.indexOf("UserData") >= 0)
+    {
+        rh_user_data = message_text.replace("UserData:", "");
+        update_user_data(rh_user_data);
+    }
+    else if(message_text.indexOf("BasicUserInfo") >= 0)
+    {
+        rh_basic_user_info = message_text.replace("BasicUserInfo:", "");
+        update_basic_user_info(rh_basic_user_info);
+    }
+    else if(message_text.indexOf("CurrentPositions") >= 0)
+    {
+        rh_current_positions = message_text.replace("CurrentPositions:", "");
+        update_current_positions(rh_current_positions);
+    }
+    else if(message_text.indexOf("AccountData") >= 0)
+    {
+        rh_account_data = message_text.replace("AccountData:", "");
+        update_account_data(rh_account_data);
     }
 };
 
@@ -230,7 +273,157 @@ function Login()
     var username = username_box.value.trim();
     var password = password_box.value.trim();
     
-    ws.send("Login:" + String(username) + ":" + String(password))
+    ws.send("Login:" + username + ":" + password);
+}
+
+var stuff = null;
+
+function update_user_data(rh_user_data)
+{
+    rh_user_data = JSON.parse(rh_user_data);
+    
+    username = document.getElementById("username-field");
+    username.innerHTML = username.innerHTML + "<h4 style='color:#FFFFFF;display:inline;'>" 
+        + rh_user_data["username"] + "</h4>";
+    
+    users_name = document.getElementById("name-field");
+    users_name.innerHTML = users_name.innerHTML + "<h4 style='color:#FFFFFF;display:inline;'>" 
+        + rh_user_data["first_name"] + " " + rh_user_data["last_name"] + "</h4>";
+
+    email = document.getElementById("email-field");
+    email.innerHTML = email.innerHTML + "<h4 style='color:#FFFFFF;display:inline;'>"
+        + rh_user_data["email"] + "</h4>";
+}
+
+function update_basic_user_info(rh_basic_user_info)
+{
+    rh_basic_user_info = JSON.parse(rh_basic_user_info);
+    
+    address = document.getElementById("address-field");
+    address.innerHTML = address.innerHTML + "<h4 style='color:#FFFFFF;display:inline;'>"
+        + rh_basic_user_info["address"] + " " + rh_basic_user_info["city"] + ", " 
+        + rh_basic_user_info["state"] + " " + rh_basic_user_info["zipcode"] + "</h4>";
+    
+    dob = document.getElementById("dob-field");
+    dob.innerHTML = dob.innerHTML + "<h4 style='color:#FFFFFF;display:inline;'>"
+        + rh_basic_user_info["date_of_birth"] + "</h4>";
+}
+
+function update_current_positions(rh_current_positions)
+{
+    rh_current_positions = rh_current_positions.split(";;;");
+    
+    positions_container = document.getElementById("position-container");
+    
+    for(i = 0; i<rh_current_positions.length; i++)
+    {
+        current_position = JSON.parse(rh_current_positions[i]);
+
+        position_div = document.createElement("div");
+        
+        gain_loss = (current_position["last_trade_price"] - current_position["average_buy_price"]) * current_position["quantity"];
+        gain_loss = Number((gain_loss).toFixed(2));
+        gain_loss_percentage = gain_loss/(current_position["average_buy_price"] * current_position["quantity"]) * 100;
+        gain_loss_percentage = Number((gain_loss_percentage).toFixed(2));
+        gain_loss_sign = "";
+        gain_loss_color = "";
+        
+        if(gain_loss_percentage >= 0)
+        {
+            gain_loss_sign = "+";
+            gain_loss_color = "robinhood-green";
+        }
+        else
+        {
+            gain_loss_color = "robinhood-red";
+        }
+        
+        position_div.innerHTML = "<div class='row'>"
+                               + "    <div class='col-md-2'></div>"
+                               + "    <div class='col-md-5'>"
+                               + "        <h4 class='robinhood-green' style='display:inline;'>Company Name:&nbsp " 
+                                   + "<h4 class='robinhood-white' style='display:inline;'>" + current_position["name"] + " (" 
+                                   + current_position["symbol"] + ")</h4></h4>"
+                               + "    </div>"
+                               + "    <div class='col-md-5'>"
+                               + "        <h4 class='robinhood-green' style='display:inline;'>Shares Owned:&nbsp "
+                                   + "<h4 class='robinhood-white' style='display:inline;'>"
+                                   + current_position["quantity"] + "</h4></h4>"
+                               + "    </div>"
+                               + "</div>"
+                               + "<div class='row'>"
+                               + "    <div class='col-md-2'></div>"
+                               + "    <div class='col-md-5'>"
+                               + "        <h4 class='robinhood-green' style='display:inline;'>Average Price Per Share:&nbsp "
+                                   + "<h4 class='robinhood-white' style='display:inline'>" 
+                                   + current_position["average_buy_price"] + "</h4></h4>"
+                               + "    </div>"
+                               + "    <div class='col-md-5'>"
+                               + "        <h4 class='robinhood-green' style='display:inline;'>Current Share Price:&nbsp "
+                                   + "<h4 class='robinhood-white' style='display:inline;'>"
+                                   + current_position["last_trade_price"] + "</h4></h4>"
+                               + "    </div>"
+                               + "</div>"
+                               + "<div class='row'>"
+                               + "    <div class='col-md-2'></div>"
+                               + "    <div class='col-md-5'>"
+                               + "        <h4 class='robinhood-green' style='display:inline;'>Total Gain/Loss:&nbsp "
+                                   + "<h4 class = '" + gain_loss_color + "' style='display:inline;'>"
+                                   + gain_loss + " (" + gain_loss_sign + gain_loss_percentage + "%)</h4></h4>"
+                               + "    </div>"
+                               + "</div>"
+                               + "<br>";
+        
+        positions_container.appendChild(position_div);
+    }
+}
+
+function update_account_data(rh_account_data)
+{
+    account_info_container = document.getElementById("account-info-container");
+    rh_account_data = JSON.parse(rh_account_data);
+    
+    account_type = "";
+    buying_power = "";
+    
+    // This is not the correct way to deteermine whether or not the account is margin or cash.  
+    // if it was cash, the cash_balances value in the rh_account_data dict would be non-null.  
+    // if it was margin, the margin_balances value in the rh_account_data dict would be non-null.  
+    // CHANGE THIS when you get some time.  
+    if(rh_account_data["cash_balances"] != null)
+    {
+        account_type = "cash";
+        buying_power = Number(rh_account_data["cash_balances"]["buying_power"]).toFixed(2);
+    }
+    else if(rh_account_data["margin_balances"] != null)
+    {
+        account_type = "margin/instant";
+        buying_power = Number(rh_account_data["margin_balances"]["overnight_buying_power"]).toFixed(2);
+    }
+    
+    account_info_container.innerHTML = "<div class='row'>"
+                                     + "    <div class='col-md-2'></div>"
+                                     + "    <div class='col-md-5'>"
+                                     + "        <h4 class='robinhood-green' style='display:inline'>Account Type:&nbsp "
+                                         + "<h4 class='robinhood-white' style='display:inline;'>"
+                                         + account_type + "</h4></h4>"
+                                     + "    </div>"
+                                     + "    <div class='col-md-5'>"
+                                     + "        <h4 class='robinhood-green' style='display:inline;'>Buying Power:&nbsp "
+                                         + "<h4 class='robinhood-white' style='display:inline;'>"
+                                         + buying_power + "</h4></h4>"
+                                     + "    </div>"
+                                     + "</div>"
+                                     + "<div class='row'>"
+                                     + "    <div class='col-md-2'></div>"
+                                     + "    <div class='col-md-5'>"
+                                     
+                                     
+                                     + "    </div>"
+                                     + "</div>"
+    
+
+
 }
 
 </script>
@@ -279,71 +472,155 @@ $(document).ready(function(){
 		</div>
 	</nav>
     <div class="container-fluid" id="main-container">
-        <div class="row">
-            <h1 class="text-center" style="color:#20CE99;display:none;">Log Into Robinhood!</h1>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-4"></div>
-            
-            <div class="col-md-4">
-                <h4 class="text-center" style="color:#FFFFFF;">
-                Logging in will allow you to view your existing positions along with opening/closing new ones.  
-                </h4>
+        <div id="login-html" style="display:none;">
+            <div class="row">
+                <h1 class="text-center" style="color:#20CE99;">Log Into Robinhood!</h1>
             </div>
             
-            <div class="col-md-4"></div>
-        </div>
-        
-        <div class="row" style="padding-top:25px;">
-        </div>
-        
-        <div class="row">
-            <img src="/static/pictures/Robinhood_Logo.png" class="robinhood-logo">
-        </div>
-        
-        <div class="row" style="padding-top:310px;">
-            <div class="col-md-4"></div>
+            <div class="row">
+                <div class="col-md-4"></div>
+                
+                <div class="col-md-4">
+                    <h4 class="text-center" style="color:#FFFFFF;">
+                    Logging in will allow you to view your existing positions along with opening/closing new ones.  
+                    </h4>
+                </div>
+                
+                <div class="col-md-4"></div>
+            </div>
             
-            <div class="col-md-4">
-                <div class="form-group" id="username-box">
-                    <label for="username" style="color:#20CE99;">Username:</label>
-                    <input type="text" class="form-control" id="username">
+            <div class="row" style="padding-top:25px;">
+            </div>
+            
+            <div class="row">
+                <img src="/static/pictures/Robinhood_Logo.png" class="robinhood-logo">
+            </div>
+            
+            <div class="row" style="padding-top:310px;">
+                <div class="col-md-4"></div>
+                
+                <div class="col-md-4">
+                    <div class="form-group" id="username-box">
+                        <label for="username" style="color:#20CE99;">Username:</label>
+                        <input type="text" class="form-control" id="username">
+                    </div>
+                </div>
+                
+                <div class="col-md-4"></div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4"></div>
+                
+                <div class="col-md-4">
+                    <div class="form-group" id="password-box">
+                        <label for="password" style="color:#20CE99;">Password:</label>
+                        <input type="password" class="form-control" id="password">
+                    </div>
+                </div>
+                
+                <div class="col-md-4"></div>
+            </div>        
+
+            <div class="row">
+                <div class="col-md-4"></div>
+            
+                <div class="col-md-4">
+                    <button type="button" class="btn btn-default" onclick="Login()">Login</button>
+                    <button type="button" class="btn btn-danger" onclick='window.location.href="/"'>Cancel</button>
+                </div>
+            
+                <div class="col-md-4"></div>
+            </div>
+        </div>
+        
+        <div id="logged-in-html" style="display:none;">
+            <div class="row">
+                <h1 class="text-center" style="color:#20CE99;" id="logged-in-title">Logged in as:&nbsp</h1>
+            </div>
+        
+            <!-- User Info -->
+            <div class="row">
+                <div class="col-md-1"></div>
+                
+                <div class="col-md-11">
+                    <h3 style="color:#FFFFFF;">User Info:</h3>
+                </div>
+            </div>
+        
+            <!-- Username -->
+            <div class="row">
+                <div class="col-md-2"></div>
+                
+                <div class="col-md-10">
+                    <h4 style="color:#20CE99;" id="username-field">Username:&nbsp </h4>
                 </div>
             </div>
             
-            <div class="col-md-4"></div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-4"></div>
-            
-            <div class="col-md-4">
-                <div class="form-group" id="password-box">
-                    <label for="password" style="color:#20CE99;">Password:</label>
-                    <input type="password" class="form-control" id="password">
+            <!-- First + Last Name -->
+            <div class="row">
+                <div class="col-md-2"></div>
+                
+                <div class="col-md-10">
+                    <h4 class= "robinhood-green"id="name-field">Name:&nbsp </h4>
                 </div>
             </div>
             
-            <div class="col-md-4"></div>
-        </div>        
-
-        <div class="row">
-            <div class="col-md-4"></div>
-        
-            <div class="col-md-4">
-                <button type="button" class="btn btn-default" onclick="Login()">Login</button>
-                <button type="button" class="btn btn-danger" onclick='window.location.href="/"'>Cancel</button>
+            <!-- Email -->
+            <div class="row">
+                <div class="col-md-2"></div>
+                
+                <div class="col-md-10">
+                    <h4 class="robinhood-green" id="email-field">Email Address:&nbsp </h4>
+                </div>
             </div>
-        
-            <div class="col-md-4"></div>
+            
+            <!-- Address -->
+            <div class="row">
+                <div class="col-md-2"></div>
+                
+                <div class="col-md-10">
+                    <h4 class="robinhood-green" id="address-field">Address:&nbsp </h4>
+                </div>
+            </div>
+            
+            <!-- Date of Birth -->
+            <div class="row">
+                <div class="col-md-2"></div>
+                
+                <div class="col-md-10">
+                    <h4 class="robinhood-green" id="dob-field">Date of Birth:&nbsp </h4>
+                </div>
+            </div>
+            <br>
+            
+            <!-- Account Info -->
+            <div class="row">
+                <div class="col-md-1"></div>
+                
+                <div class="col-md-11">
+                    <h3 style="color:#FFFFFF;">Account Info:&nbsp </h3>
+                </div>
+                
+                <div class="col-md-10"></div>
+            </div>
+            <div id="account-info-container"></div>
+            <br>
+
+            <!-- Current Positions -->
+            <div class="row">
+                <div class="col-md-1"></div>
+                
+                <div class="col-md-11">
+                    <h3 class="robinhood-white">Current Positions:&nbsp </h3>
+                </div>
+            </div>
+            
+            <div id="position-container"></div>
+            <br>
         </div>
-
-
-
+        
     </div>
-
-
 
 
     <footer class="footer">

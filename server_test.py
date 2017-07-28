@@ -22,6 +22,7 @@ import copy
 import requests
 import MySQLdb
 import atexit
+import json
 from yahoo_finance import Share
 from bs4 import BeautifulSoup
 
@@ -35,7 +36,7 @@ from dividend_stripper import strip_dividends
 from bollinger_bands import BollingerBandStrategy
 from yahoo_finance_historical_data_extractor import YFHistoricalDataExtract
 from http_request_randomizer.requests.proxy.requestProxy import RequestProxy
-from robinhood import RobinhoodInstance
+from robinhood import RobinhoodInstance, GET_ALL
 
 # ---------------------------------------------------------------------------- #
 # Global Variables                                                             #
@@ -395,6 +396,8 @@ class MainWsHandler(tornado.websocket.WebSocketHandler):
         elif "CheckRobinhoodLogin" in message:
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
                 self.write_message("RobinhoodLoggedIn:%s" % str(ROBINHOOD_INSTANCE.username))
+            else:
+                self.write_message("RobinhoodNotLoggedIn")
 
 
 
@@ -596,6 +599,8 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
             print "HELLO WORLD!!! HELLO WORLD!!! HELLO WORLD!!!%s" % ROBINHOOD_INSTANCE
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
                 self.write_message("RobinhoodLoggedIn:%s" % ROBINHOOD_INSTANCE.username)
+            else:
+                self.write_message("RobinhoodNotLoggedIn")
 
 class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, _):
@@ -663,6 +668,41 @@ class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
         elif "CheckRobinhoodLogin" in message:
             if ROBINHOOD_INSTANCE.is_logged_in() is True:
                 self.write_message("RobinhoodLoggedIn:%s" % ROBINHOOD_INSTANCE.username)
+                
+                # User Data
+                user_data = ROBINHOOD_INSTANCE.get_user_data(GET_ALL)
+                user_data = json.dumps(user_data)
+                self.write_message("UserData:%s" % user_data)
+                
+                # Basic User Info
+                basic_user_info = ROBINHOOD_INSTANCE.get_basic_user_info(GET_ALL)
+                basic_user_info = json.dumps(basic_user_info)
+                self.write_message("BasicUserInfo:%s" % basic_user_info)
+                
+                # Positions
+                account_positions = ROBINHOOD_INSTANCE.get_position_history(active=True)
+                account_string = ""
+                for position in account_positions:
+                    # Get data about the position, including current price.  
+                    position_data = requests.get(position["instrument"])
+                    position_data = json.loads(position_data._content)
+                    position.update(position_data)
+
+                    quote_data = requests.get(position["quote"]);
+                    quote_data = json.loads(quote_data._content)
+                    position.update(quote_data)
+                    
+                    account_string = account_string + json.dumps(position) + ";;;"
+                    
+                account_string = account_string[:-3]
+                self.write_message("CurrentPositions:%s" % account_string)
+                
+                # Account Data
+                account_data = ROBINHOOD_INSTANCE.get_account_data("all")
+                account_data = json.dumps(account_data)
+                self.write_message("AccountData:%s" % account_data)
+            else:
+                self.write_message("RobinhoodNotLoggedIn")
 
 # ---------------------------------------------------------------------------- #
 # Generic File Handler                                                         #
@@ -732,14 +772,15 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------ #
 
 
-    # REMOVE THIS LATER!!!!!!!
-
-
-
-
-
     # Wipe any old temp directory if there is one
     if os.path.exists(TEMP_DIR):
+        
+        #
+        #
+        # Uncomment this later!
+        #
+        #
+        
         #os.system("rm -rf %s" % TEMP_DIR)
         pass
 
@@ -754,36 +795,25 @@ if __name__ == '__main__':
     # Instantiate the robinhood object
     ROBINHOOD_INSTANCE = RobinhoodInstance()
 
+    # Generate file of tickers using the robinhood API if you haven't done 
+    # that already
     if not os.path.exists("%s/%s" % (TEMP_DIR, TICKER_FILE)):
         print "Creating ticker file!"
-        
-        
-        #
-        #
-        # UNCOMMENT THIS LATER!!!
-        #
-        #
-        
-        #ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
 
-    #
-    #
-    #
-    #
-    # TODO: GENERATE THE STOCK FILE HERE USING ROBINHOOD API!!!
-    #
-    #
-    #
+        ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
 
     # Create an object to deal with retrieving historical data.
-    YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE),
-            data_storage_dir="%s/historical_stock_data" % TEMP_DIR)
+    #YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE),
+    #        data_storage_dir="%s/historical_stock_data" % TEMP_DIR)
 
     # Install the atexit handler which will wipe the temporary files stored in /tmp.
     atexit.register(clean_up_tmp_directory)
 
+    print "Done with setup.  Starting server"
+
     # Start the tornado server.
     tornado.ioloop.IOLoop.instance().start()
+
 
 """
 
