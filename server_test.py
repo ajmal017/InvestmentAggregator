@@ -14,6 +14,7 @@
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
+import tornado.autoreload
 from tornado.options import define, options, parse_command_line
 import os
 import sys
@@ -810,6 +811,11 @@ if __name__ == '__main__':
     atexit.register(clean_up_tmp_directory)
 
     print "Done with setup.  Starting server"
+
+    tornado.autoreload.start()
+    
+    for dir, _, files in os.walk("./static"):
+        [tornado.autoreload.watch(dir + '/' + f) for f in files if not f.startswith('.')]
 
     # Start the tornado server.
     tornado.ioloop.IOLoop.instance().start()

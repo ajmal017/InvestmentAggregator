@@ -677,6 +677,11 @@ ws.onmessage = function(received_message)
         robinhood_container.innerHTML = '<li><a href="/robinhood_login" '
             + 'style="color:#20CE99;">Logged Into Robinhood as: ' + String(username) 
             + '</a></li>';
+            
+        main_trading_container = document.getElementById("robinhood-trading-container");
+        main_trading_container.style="";
+        
+        
     }
 };
 
@@ -796,6 +801,24 @@ function ExecuteQuery()
 				<h4 class="stock-info-text" id="year-low">Year Low:&nbsp;&nbsp;</h4>
 				<h4 class="stock-info-text" id="200-day-ma">200 Day MA:&nbsp;&nbsp;</h4>
 			</div>
+        </div>
+        
+        
+        <div id="robinhood-trading-container" style="display:none;">
+            <div class="row">
+                <div class="col-md-12" id="robinhood-title">
+                    <h3 style="text-align: left;padding-bottom:1%;" class="title-color">Trade With Robinhood</h3>
+                </div>
+            </div>
+            <div class="row">
+                <!--<div class="col-md-1"></div>-->
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-success btn-block">Buy</button>
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-danger btn-block">Sell</button>
+                </div>
+            </div>
         </div>
         
         <div class="row">
