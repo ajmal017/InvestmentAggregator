@@ -602,6 +602,37 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
                 self.write_message("RobinhoodLoggedIn:%s" % ROBINHOOD_INSTANCE.username)
             else:
                 self.write_message("RobinhoodNotLoggedIn")
+                
+        elif "GetPosition" in message:
+
+            ticker = message.replace("GetPosition:", "")
+
+            account_positions = ROBINHOOD_INSTANCE.get_position_history(active=True)
+            user_owns_stock = False
+            position_string = ""
+            for position in account_positions:
+                
+                # Get data about the position, including current price.  
+                position_data = requests.get(position["instrument"])
+                position_data = json.loads(position_data._content)
+                position.update(position_data)
+
+                if position["symbol"] != ticker:
+                    continue
+
+                quote_data = requests.get(position["quote"]);
+                quote_data = json.loads(quote_data._content)
+                position.update(quote_data)
+                
+                position_string = json.dumps(position)
+                user_owns_stock = True
+                
+            if user_owns_stock is True:
+                self.write_message("Position:%s" % position_string)
+            else:
+                self.write_message("Position:None")
+
+            
 
 class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, _):
@@ -716,6 +747,9 @@ class ProgramFileHandler(tornado.web.StaticFileHandler):
 
     def get(self, path=None, include_body=True):
         program_file = str(self.dirname) + '/' + str(self.filename) + '/' + str(path)
+        
+        self.absolute_path = program_file
+        
         super(ProgramFileHandler, self).get(program_file, include_body)
 
 # This handler deals with everything in the temp directory
@@ -804,8 +838,8 @@ if __name__ == '__main__':
         ROBINHOOD_INSTANCE.get_all_instruments("%s/%s" % (TEMP_DIR, TICKER_FILE))
 
     # Create an object to deal with retrieving historical data.
-    #YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE),
-    #        data_storage_dir="%s/historical_stock_data" % TEMP_DIR)
+    YAHOO_FINANCE_HISTORICAL_OBJECT = YFHistoricalDataExtract("%s/%s" % (TEMP_DIR, TICKER_FILE),
+            data_storage_dir="%s/historical_stock_data" % TEMP_DIR)
 
     # Install the atexit handler which will wipe the temporary files stored in /tmp.
     atexit.register(clean_up_tmp_directory)

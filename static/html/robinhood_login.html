@@ -208,6 +208,14 @@ ws.onmessage = function(received_message)
         var fields = message_text.split(":");
         var username = fields[1];
     
+        // I'm having a weird eerror come up here where it's saying that robinhood-container isn't defined.  
+        // I'm assuming this has something to do with the page not loading correctly.  To fix this, I'm going 
+        // to delay the line for a few miliseconds in order to allow the page to load more
+        for(i=0; i<100000; i++)
+        {
+            
+        }
+    
         robinhood_container = document.getElementById("robinhood-container");
         
         robinhood_container.innerHTML = '<li><a href="/robinhood_login" '
@@ -481,7 +489,7 @@ $(document).ready(function(){
                 <div class="col-md-4"></div>
                 
                 <div class="col-md-4">
-                    <h4 class="text-center" style="color:#FFFFFF;">
+                    <h4 class="text-center robinhood-white">
                     Logging in will allow you to view your existing positions along with opening/closing new ones.  
                     </h4>
                 </div>
@@ -532,6 +540,26 @@ $(document).ready(function(){
             
                 <div class="col-md-4"></div>
             </div>
+        
+            <div class="row" style="padding-top:3%;">
+                <h3 class="text-center robinhood-green">Don't have Robihood?  Sign up using this link to get a free share of stock!</h3>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-3"></div>
+                
+                <div class="col-md-6">
+                    <p style="text-align:center;padding-top:2%;padding-bottom:5%;">
+                        <a href="https://robinhood.com/referral/andrewk377/" target="_blank">
+                        <img src="/static/pictures/free_stock.png" 
+                            style="cursor:pointer;cursor:hand;">
+                        </a>
+                    </p>
+                </div>
+            
+                <div class="col-md-3"></div>
+            </div>
+            
         </div>
         
         <div id="logged-in-html" style="display:none;">
