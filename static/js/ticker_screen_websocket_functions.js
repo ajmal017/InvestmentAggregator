@@ -53,7 +53,8 @@ function update_stock_data(message_text)
 
     // Incorporate this current stock data into the existing HTML
     document.getElementById("stock-price").innerHTML = "$" + price;
-    document.getElementById("stock-percent-change").innerHTML = percent_change;
+    percent_change_box = document.getElementById("stock-percent-change");
+    percent_change_box.innerHTML = percent_change;
 
     if(percent_change.indexOf("-") >= 0)
     {
@@ -80,14 +81,118 @@ function update_stock_data(message_text)
     document.getElementById("stock-days-high").innerHTML = "$" + days_high;
     document.getElementById("stock-days-low").innerHTML = "$" + days_low;
     document.getElementById("stock-year-high").innerHTML = "$" + year_high;
-    document.getElememtById("stock-year-low").innerHTML = "$" + year_low;
+    document.getElementById("stock-year-low").innerHTML = "$" + year_low;
     document.getElementById("stock-200-day-ma").innerHTML = "$" + two_hundred_day_ma;
 }
 
 function update_company_description(message_text)
 {
     message_text = message_text.replace("CompanyDescription:", "");
-    var description_div = document.getElementById("style-1");
+    description_div = document.getElementById("style-1");
     description_div.innerHTML = message_text;
+}
+
+function update_dividend_history_data(message_text)
+{
+    message_text = message_text.replace("DividendHistoryData:", "");
+    dividend_container = document.getElementById("panel-body-1");
+    dividend_container.innerHTML = message_text.replace("table-hover", "").replace("table-striped", "");
+}
+
+function update_dividend_record(message_text)
+{
+    message_text = message_text.replace("DividendRecord:", "");
+    dividend_record_container = document.getElementById("panel-body-10");
+    dividend_record_container.innerHTML = message_text;
+}
+
+function update_bollinger_bands(message_text)
+{
+    message_text = message_text.replace("BB:", "");
+    var bb_image_container = document.getElementById("bb-image-container");
+    bb_image_container.innerHTML = "<img src=\"/tmp/" + String(stock_ticker) + ".png\"></img>";
+    
+    var bb_text_container = document.getElementById("bb-recommendation-container");
+    if(message_text == "GoodCandidate")
+    {
+        bb_text_container.innerHTML = "<h3 style = \"padding-left:1%;\">Bollinger Band history shows buy signal</h3>";
+        bb_text_container.className = "stock-up-text";
+    }
+    else
+    {
+        bb_text_container.innerHTML = "<h3 style=\"padding-left:1%;\">Bollinger Band history says nothing currently</h3>";
+        bb_text_container.className = "stock-down-text";
+    }
+}
+
+function update_robinhood_logged_in(message_text)
+{
+    var fields = message_text.split(":");
+    var username = fields[1];
+
+    robinhood_container = document.getElementById("robinhood-container");
+    
+    robinhood_container.innerHTML = '<li><a href="/robinhood_login" '
+        + 'style="color:#20CE99;">Logged Into Robinhood as: ' + String(username) 
+        + '</a></li>';
+        
+    main_trading_container = document.getElementById("robinhood-trading-container");
+    main_trading_container.style="";
+
+    ws.send("GetPosition:" + stock_ticker);
+}
+
+function update_position(message_text)
+{
+    message_text = message_text.replace("Position:", "");
+    
+    position_div = document.getElementById("current-robinhood-position");
+    
+    if(message_text == "None")
+    {
+        position_div.innerHTML = "0 Shares";
+        
+        return;
+    }
+    else
+    {
+        current_position = JSON.parse(message_text)
+        
+        gain_loss = (current_position["last_trade_price"] - current_position["average_buy_price"]) * current_position["quantity"];
+        gain_loss = Number((gain_loss).toFixed(2));
+        gain_loss_percentage = gain_loss/(current_position["average_buy_price"] * current_position["quantity"]) * 100;
+        gain_loss_percentage = Number((gain_loss_percentage).toFixed(2));
+        gain_loss_sign = "";
+        gain_loss_color = "";
+        
+        // Update the number of shares currently owned
+        position_div.innerHTML = Number(current_position["quantity"]).toFixed(2) + " Shares";
+        
+        // Update the average buy cost
+        position_container = document.getElementById("position-container");
+        position_container.style = "display:inline;";
+        
+        average_cost = document.getElementById("position-average-cost");
+        average_cost.innerHTML = "$" + current_position["average_buy_price"];
+        average_cost.style = "display:inline;";
+        
+        // Update the total gain/loss of this position
+        gain_loss_container = document.getElementById("gain-loss-container")
+        gain_loss_container.style = "display:inline;";
+        
+        position_gain_loss = document.getElementById("position-gain-loss");
+        position_gain_loss.style = "display:inline;";
+        
+        if(gain_loss >= 0.00)
+        {
+            position_gain_loss.className = "robinhood-green";
+            position_gain_loss.innerHTML = " +" + gain_loss + " (+" + gain_loss_percentage + ")";
+        }
+        else
+        {
+            position_gain_loss.className = "robinhood-red";
+            position_gain_loss.innerHTML = " " + gain_loss + " (" + gain_loss_percentage + ")";
+        }
+    }
 }
 

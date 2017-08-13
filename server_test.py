@@ -27,6 +27,8 @@ import json
 from yahoo_finance import Share
 from bs4 import BeautifulSoup
 
+
+
 sys.path.append(".")
 sys.path.append("./AccessoryLibraries/BollingerBandStrategy/")
 sys.path.append("./AccessoryLibraries/YahooFinanceHistoricalDataExtractor/")
@@ -91,163 +93,6 @@ req_proxy = None
 if use_proxy is True:
     req_proxy = RequestProxy()
 
-# ---------------------------------------------------------------------------- #
-# Database Call Level Interface                                                #
-# ---------------------------------------------------------------------------- #
-
-"""
-
-class stock_database:
-    def __init__(self):
-        self.initialized = False
-        self.database_object = None
-
-        print_logger.debug("Database object initialized successfully.")
-
-
-    def connect(self):
-        print_logger.debug("Connecting to database: %s" % DB_PRIMARY_DATABASE)
-        self.database_object = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASSWD)
-
-        # Attempt to use the existing greenhouse database
-        current_pointer = self.database_object.cursor()
-
-        try:
-            current_pointer = self.database_object.cursor()
-            result = current_pointer.execute("USE %s;" % DB_PRIMARY_DATABASE)
-
-            print_logger.debug("Greenhouse database used successfully.")
-        except Exception as e:
-            print_logger.debug("Greenhouse database use failed.  Attempting to create.")
-
-            # The database doesn't exist, create it
-            try:
-                current_pointer = self.database_object.cursor()
-                result = current_pointer.execute("CREATE DATABASE %s;" % DB_PRIMARY_DATABASE)
-
-                print_logger.debug("Created the greenhouse database.")
-
-                current_pointer = self.database_object.cursor()
-                result = current_pointer.execute("USE %s" % DB_PRIMARY_DATABASE)
-
-                print_logger.debug("Greenhouse database used successfully.")
-            except Exception as e:
-                print_logger.error("Could not create or use the greenhouse database.")
-                sys.exit(1)
-
-        # Database object is now up and running
-        print_logger.debug("Connected to database successfully.")
-        self.initialized = True
-
-    def disconnect(self):
-        # Close the cursor first
-        self.database_object.cursor().close()
-
-        # Close the database object
-        self.database_object.close()
-
-        # The database objet is no longer initialized
-        self.initialized = False
-
-        print_logger.debug("Successfully disconnected from the database.")
-
-    def issue_db_command(self, cmd, silent = False):
-        " ""
-        Issue a generic command denoted by cmd to the database.  Performs basic
-        error checking and loggs the result.  Returns the result of the command
-        False if it failed.
-        " ""
-
-        print_logger.debug("Issuing command: %s" % str(cmd))
-
-        if self.initialized is False:
-            print_logger.error("Database not initialized.")
-            return
-
-        current_pointer = self.database_object.cursor()
-
-        try:
-            # Execute the command
-            result = current_pointer.execute(cmd)
-
-            self.database_object.commit()
-
-            return current_pointer.fetchall()
-        except Exception as e:
-            if silent == False:
-                print_logger.error("Could not execute command: ")
-                print_logger.error("  - Error Message: %s" % str(e[1]))
-                print_logger.error("  - Failed Command: %s" % str(cmd))
-            else:
-                print_logger.debug("Could not execute command: ")
-                print_logger.debug("  - Error Message; %s" % str(e[1]))
-                print_logger.debug("  - Failed Command: %s" % str(cmd))
-
-            return False
-
-    def check_tables(self):
-        " ""
-        Make sure that every table in the database is where it should be.
-        If there are any problems, rerun the commands
-        " ""
-
-        print_logger.debug("Checking tables for consistency.")
-
-        pass
-
-"""
-
-# ---------------------------------------------------------------------------- #
-# Ticker Data                                                                  #
-# ---------------------------------------------------------------------------- #
-
-"""
-
-class ticker_data:
-    def __init__(self):
-        # Read in the file
-        if os.path.exists(TICKER_FILE):
-            f = open(TICKER_FILE, "r")
-        else:
-
-            # TODO: Call robinhood to get it to keep the
-
-            pass
-
-
-        self.stock_dict = {}
-
-        for line in f.readlines():
-            line = line.split(",")
-
-            # Sometimes, the line lengths don't come out quite right.  If that
-            # is the case, just skip to the next line.
-            if len(line) != 3:
-                continue
-
-            self.stock_dict.update({line[1] : (line[0], line[2])})
-
-    def is_valid_stock(self, ticker_symbol):
-
-        # Make sure that the symbol is upper case
-        ticker_symbol = ticker_symbol.upper()
-
-        # Check to see if it is in the stock dictionary
-        if ticker_symbol in self.stock_dict.keys():
-            return True
-        else:
-            return False
-
-
-    def update_traded_stocks(self):
-        " ""
-        <stub>: This function should call the program which updates the current
-        list of publicly traded stocks.  Update this sometime in the future.
-        " ""
-
-        pass
-
-"""
 
 def update_description_oneoff(ticker):
     if use_proxy is True:
@@ -316,6 +161,17 @@ def get_company_title(ticker):
     except Exception:
         return "(%s) Name Not Found" % ticker
 
+def validate_ticker(ticker):
+        try:
+            test = Share(ticker)
+
+            if test.get_price() is None:
+                return False
+        except NameError:
+            return False
+        
+        return True
+
 # ---------------------------------------------------------------------------- #
 # Static Handlers                                                              #
 # ---------------------------------------------------------------------------- #
@@ -369,23 +225,7 @@ class MainWsHandler(tornado.websocket.WebSocketHandler):
 
             ticker = message[1]
 
-            # The file I have stored didn't end up being a good validation
-            # option as it does not contain a complete list of all
-            # securities.  I have to acquire the data from yahoo
-            # finance anyway, so just use that.  The Share function
-            # call will throw a NameError exception if the ticker doesn't exist
-            # isValid = current_stock_list.is_valid_stock(ticker)
-
-            isValid = True
-            try:
-                test = Share(str(ticker))
-
-                if test.get_price() is None:
-                    isValid = False
-            except NameError:
-                isValid = False
-
-            if isValid:
+            if validate_ticker(ticker):
                 self.write_message("ValidationSucceeded:%s" % ticker)
                 print_logger.debug("Ticker was valid")
             else:
@@ -422,23 +262,7 @@ class TickerWsHandler(tornado.websocket.WebSocketHandler):
 
             ticker = message[1]
 
-            # The file I have stored didn't end up being a good validation
-            # option as it does not contain a complete list of all
-            # securities.  I have to acquire the data from yahoo
-            # finance anyway, so just use that.  The Share function
-            # call will throw a NameError exception if the ticker doesn't exist
-            # isValid = current_stock_list.is_valid_stock(ticker)
-
-            isValid = True
-            try:
-                test = Share(str(ticker))
-
-                if test.get_price() is None:
-                    isValid = False
-            except NameError:
-                isValid = False
-
-            if isValid:
+            if validate_ticker(ticker):
                 self.write_message("ValidationSucceeded:%s" % ticker)
                 print_logger.debug("Ticker was valid")
             else:
@@ -737,35 +561,8 @@ class RobinhoodWsHandler(tornado.websocket.WebSocketHandler):
                 self.write_message("RobinhoodNotLoggedIn")
 
 # ---------------------------------------------------------------------------- #
-# Generic File Handler                                                         #
-# ---------------------------------------------------------------------------- #
-
-class ProgramFileHandler(tornado.web.StaticFileHandler):
-    def initialize(self, path):
-        self.dirname, self.filename = os.path.split(path)
-        super(ProgramFileHandler, self).initialize(self.dirname)
-
-    def get(self, path=None, include_body=True):
-        program_file = str(self.dirname) + '/' + str(self.filename) + '/' + str(path)
-        
-        self.absolute_path = program_file
-        
-        super(ProgramFileHandler, self).get(program_file, include_body)
-
-# This handler deals with everything in the temp directory
-class TmpFileHandler(tornado.web.StaticFileHandler):
-    def initialize(self, path):
-        self.dirname, self.filename = os.path.split(path)
-        super(TmpFileHandler, self).initialize(self.dirname)
-
-    def get(self, path=None, include_body=True):
-        program_file = str(self.dirname) + '/' + str(self.filename) + '/' + str(path)
-        super(TmpFileHandler, self).get(program_file, include_body)
-
-# ---------------------------------------------------------------------------- #
 # Master Handler List                                                          #
 # ---------------------------------------------------------------------------- #
-
 
 settings = {}
 handlers = [
@@ -777,8 +574,9 @@ handlers = [
     (r'/ws_robinhood_login', RobinhoodWsHandler),
     (r'/investing_tips', TipsHandler),
     (r'/investing_strategies', StrategiesHandler),
-    (r'/static/(.*)', ProgramFileHandler, {'path' : './static'}),
-    (r'/tmp/(.*)', TmpFileHandler, {'path' : '%s' % TEMP_DIR})
+    (r'/static/(.*)', tornado.web.StaticFileHandler, {'path' : os.path.join(os.getcwd(), 'static')}),
+    (r'/(favicon\.ico)', tornado.web.StaticFileHandler, {"path" : os.path.join(os.getcwd(), "")}),
+    (r'/tmp/(.*)', tornado.web.StaticFileHandler, {'path' : os.path.join(TEMP_DIR, "")})
     ]
 
 # ---------------------------------------------------------------------------- #
@@ -853,42 +651,3 @@ if __name__ == '__main__':
 
     # Start the tornado server.
     tornado.ioloop.IOLoop.instance().start()
-
-
-"""
-
-    # Set the logger verbosity
-    if options.logger == "qq":
-        print_logger.setLevel(logging.CRITICAL)
-    elif options.logger == "q":
-        print_logger.setLevel(logging.ERROR)
-    elif options.logger == "":
-        print_logger.setLevel(logging.WARNING)
-    elif options.logger == "v":
-        print_logger.setLevel(logging.INFO)
-    elif options.logger == "vv":
-        print_logger.setLevel(logging.DEBUG)
-    else:
-        print_logger.setLevel(logging.WARNING)
-
-    # Load the current list of publicly traded stocks
-    current_stock_list = ticker_data()
-
-    # Initialize the solr object
-    current_solr_object = solr_search.solr_search()
-
-    # Update the database code at a later date
-
-    # Initialize the database object
-    #current_greenhouse_database = greenhouse_database()
-
-    # Connect to the database
-    #current_greenhouse_database.connect()
-
-    # REMOVE THIS LATER
-    #clean_tables()
-
-    # Make sure all of the tables are where they should be.
-    #current_greenhouse_database.check_tables()
-
-"""
